@@ -34,28 +34,28 @@ Once loaded, you can give `skill-adapter` a path to an external skill ZIP (or an
 During a mechanical inspection, `skill-adapter` examines the following aspects of a candidate skill package:
 
 <CardGroup cols={2}>
-  <Card title="Path safety" icon="shield-check" href="#what-skill-adapter-checks">
+  <Card title="Path safety" icon="shield-check" href="/using-skills/skill-adapter">
     Flags absolute paths, `..` traversal, backslashes, drive letters, empty segments, and single wrapper directories at the ZIP root.
   </Card>
-  <Card title="ZIP entries" icon="file-zipper" href="#what-skill-adapter-checks">
+  <Card title="ZIP entries" icon="file-zipper" href="/using-skills/skill-adapter">
     Verifies that all ZIP entries use POSIX `/` separators. Backslash entries are a hard fail.
   </Card>
-  <Card title="File inventory" icon="list" href="#what-skill-adapter-checks">
+  <Card title="File inventory" icon="list" href="/using-skills/skill-adapter">
     Walks the full extracted file tree and categorises every file as a likely support, tool, or asset file.
   </Card>
-  <Card title="Candidate manifests" icon="file-code" href="#what-skill-adapter-checks">
+  <Card title="Candidate manifests" icon="file-code" href="/using-skills/skill-adapter">
     Reads an existing `MANIFEST.json` if present and validates it against the system rules. Reports whether it can be reused, needs correction, or must be replaced.
   </Card>
-  <Card title="Likely primary file" icon="star" href="#what-skill-adapter-checks">
+  <Card title="Likely primary file" icon="star" href="/using-skills/skill-adapter">
     Searches for `SKILL.md`, `skill.md`, `README.md`, or the first Markdown file to propose a `primary_file` candidate.
   </Card>
-  <Card title="Scripts" icon="terminal" href="#what-skill-adapter-checks">
+  <Card title="Scripts" icon="terminal" href="/using-skills/skill-adapter">
     Identifies script files (`.py`, `.sh`, `.js`, etc.) and — for Python — parses imports to flag non-standard-library dependencies.
   </Card>
-  <Card title="Binary files" icon="database" href="#what-skill-adapter-checks">
+  <Card title="Binary files" icon="database" href="/using-skills/skill-adapter">
     Detects non-textual assets and notes any that are referenced in `load_sequence`, which is a hard blocker.
   </Card>
-  <Card title="External mechanism indicators" icon="triangle-exclamation" href="#what-skill-adapter-checks">
+  <Card title="External mechanism indicators" icon="triangle-exclamation" href="/using-skills/skill-adapter">
     Scans text files for markers such as `pip install`, `npm install`, `daemon`, `watcher`, `webhook`, and source-runtime wording (e.g. `claude`) that indicate incompatible runtime assumptions.
   </Card>
 </CardGroup>
@@ -65,13 +65,13 @@ During a mechanical inspection, `skill-adapter` examines the following aspects o
 Every report produced by `skill-adapter` ends with one of three ratings:
 
 <CardGroup cols={3}>
-  <Card title="PASS" icon="circle-check" href="#compatibility-ratings">
+  <Card title="PASS" icon="circle-check" href="/using-skills/skill-adapter">
     No hard blockers found. The package can be built under the current rules. Any remaining assumptions are stated explicitly in the report.
   </Card>
-  <Card title="PASS_WITH_WARNINGS" icon="circle-exclamation" href="#compatibility-ratings">
+  <Card title="PASS_WITH_WARNINGS" icon="circle-exclamation" href="/using-skills/skill-adapter">
     The package can be built, but some files or behaviors require operator review or task-time caution before the skill is used in production.
   </Card>
-  <Card title="BLOCKED" icon="ban" href="#compatibility-ratings">
+  <Card title="BLOCKED" icon="ban" href="/using-skills/skill-adapter">
     A hard blocker prevents a valid package candidate. The report lists every blocker and, where possible, describes the fix required.
   </Card>
 </CardGroup>
@@ -86,8 +86,8 @@ The following conditions always produce a **BLOCKED** rating. None of them can b
 - **Invalid manifest identity** — `skill_name` does not match the expected slug, or required manifest fields are missing or the wrong type.
 - **Mounted file not readable as UTF-8** — any file in `load_sequence` that cannot be decoded as UTF-8 text.
 - **Script or binary file in `load_sequence`** — only AI-only UTF-8 textual files may be semantically mounted.
-- **Required `pip install` or network install** — tool files that depend on packages unavailable in the GPT Python environment.
-- **Required hook, daemon, watcher, external CLI, or persistent service** — the skill depends on runtime mechanisms the system does not provide.
+- **Required dependency unavailable in the GPT Python environment** — tool files that depend on packages not available in the GPT Python environment.
+- **Required hook, daemon, watcher, external CLI, local app, or network install** — the skill depends on runtime mechanisms the system does not provide.
 
 ## Report output shape
 

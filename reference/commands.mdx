@@ -1,7 +1,7 @@
 ---
-title: "GPT Project Skill System command reference"
+title: "GPT Project Skill System — Lifecycle Command Reference"
 sidebarTitle: "Commands"
-description: "Full reference for all three GPT Project Skill System lifecycle commands: SKILL CORE UNPACK, SKILL UNPACK, and SKILL LOAD."
+description: "Reference for all three lifecycle commands: SKILL CORE UNPACK boots the core, SKILL <name> UNPACK installs a skill, and SKILL <name> LOAD activates it."
 ---
 
 The GPT Project Skill System exposes three lifecycle commands that you type directly in a ChatGPT Project chat. Each command has a single declared target, performs strict validation before acting, and hard-fails on any error — it never silently continues past an invalid state. Understanding each command's scope and boundaries is essential before adding skills to a Project.

@@ -21,6 +21,7 @@ When you run `SKILL <name> UNPACK`, the runtime:
 3. Verifies that the ZIP contains a root `MANIFEST.json` with no single wrapper directory surrounding the package.
 4. Verifies that the `skill_name` field inside the manifest equals `<name>`.
 5. Extracts the ZIP into `/mnt/data/GPT.SKILLS/SKILLS/<name>/`, overwriting any previously extracted copy for the same skill name.
+6. Validates the skill package enough to support later load.
 
 **Example:**
 

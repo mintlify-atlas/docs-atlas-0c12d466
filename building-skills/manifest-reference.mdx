@@ -1,7 +1,7 @@
 ---
-title: "MANIFEST.json field reference for skill packages"
+title: "MANIFEST.json field reference for GPT skill packages"
 sidebarTitle: "Manifest Reference"
-description: "Complete reference for every MANIFEST.json field in GPT Project Skill System skill packages, including required and optional fields with types and validation rules."
+description: "Complete MANIFEST.json field reference for GPT Project Skill System packages: required fields, load behavior, file categories, and validation rules."
 ---
 
 `MANIFEST.json` is the identity and configuration file for every skill package. Every skill package must include one at the ZIP root — it is the first thing the loader reads during both `SKILL <name> UNPACK` and `SKILL <name> LOAD`. The manifest drives validation, physical unpack behavior, and semantic mount behavior. Without a valid `MANIFEST.json`, the skill cannot be installed or loaded.
@@ -73,28 +73,28 @@ These fields are descriptive only. They carry no runtime enforcement and do not 
 The following conditions cause a hard fail during unpack or load. A hard fail stops the operation immediately with an error message.
 
 <CardGroup cols={2}>
-  <Card title="Missing required field" icon="circle-xmark">
+  <Card title="Missing required field" icon="circle-xmark" href="/building-skills/manifest-reference">
     Either `skill_name` or `version` is absent from the manifest.
   </Card>
-  <Card title="Invalid skill_name" icon="circle-xmark">
+  <Card title="Invalid skill_name" icon="circle-xmark" href="/building-skills/manifest-reference">
     `skill_name` does not match `^[a-z0-9_-]+$`, is empty, or does not match the ZIP filename, command slug, or installed folder.
   </Card>
-  <Card title="Empty version" icon="circle-xmark">
+  <Card title="Empty version" icon="circle-xmark" href="/building-skills/manifest-reference">
     `version` is present but is an empty string.
   </Card>
-  <Card title="primary_file not in load_sequence" icon="circle-xmark">
+  <Card title="primary_file not in load_sequence" icon="circle-xmark" href="/building-skills/manifest-reference">
     `primary_file` is declared but the value is not listed in `load_sequence`.
   </Card>
-  <Card title="Partial load pair" icon="circle-xmark">
+  <Card title="Partial load pair" icon="circle-xmark" href="/building-skills/manifest-reference">
     Exactly one of `primary_file` or `load_sequence` is present. Both must be provided or both must be omitted.
   </Card>
-  <Card title="load_sequence / support_files overlap" icon="circle-xmark">
+  <Card title="load_sequence / support_files overlap" icon="circle-xmark" href="/building-skills/manifest-reference">
     A path appears in both `load_sequence` and `support_files`.
   </Card>
-  <Card title="Unsafe paths" icon="circle-xmark">
+  <Card title="Unsafe paths" icon="circle-xmark" href="/building-skills/manifest-reference">
     Any declared path is absolute, contains `..`, uses backslashes, contains empty segments, or contains a drive letter.
   </Card>
-  <Card title="Script or binary in load_sequence" icon="circle-xmark">
+  <Card title="Script or binary in load_sequence" icon="circle-xmark" href="/building-skills/manifest-reference">
     A file with an executable or binary extension (`.py`, `.sh`, `.js`, `.exe`, and similar) appears in `load_sequence`.
   </Card>
 </CardGroup>

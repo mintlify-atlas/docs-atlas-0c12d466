@@ -1,5 +1,5 @@
 ---
-title: "Building and validating skill packages with build_packages.py"
+title: "Building and validating skill packages with build_packages"
 sidebarTitle: "Packaging"
 description: "Use the build_packages.py script to create and validate GPT.SKILLS.zip and skill ZIPs with correct POSIX paths and no wrapper directories."
 ---
@@ -47,34 +47,34 @@ The script processes the core and all skills in a fixed sequence:
 The build script performs the following checks for every package it builds. Any failure is a hard stop.
 
 <CardGroup cols={2}>
-  <Card title="Package shape" icon="folder-check">
+  <Card title="Package shape" icon="folder-check" href="/building-skills/packaging">
     The ZIP root contents match the expected layout — `SYSTEM_CORE/` and `SKILLS/` for the core; `MANIFEST.json` at root for skills.
   </Card>
-  <Card title="ZIP path separators" icon="slash">
+  <Card title="ZIP path separators" icon="slash" href="/building-skills/packaging">
     Every ZIP entry uses POSIX `/` separators. Any entry containing `\` causes an immediate failure.
   </Card>
-  <Card title="Manifest fields" icon="file-check">
+  <Card title="Manifest fields" icon="file-check" href="/building-skills/manifest-reference">
     Required fields are present and have the correct types. `system_name` and `version` are validated against exact expected values for the core.
   </Card>
-  <Card title="Load files" icon="file-lines">
+  <Card title="Load files" icon="file-lines" href="/building-skills/skill-package-format">
     All files in `load_sequence` exist, are readable as UTF-8, and are not scripts or binary assets.
   </Card>
-  <Card title="Support files" icon="file">
+  <Card title="Support files" icon="file" href="/building-skills/skill-package-format">
     All declared `support_files` exist and have safe relative paths.
   </Card>
-  <Card title="Tool files" icon="code">
+  <Card title="Tool files" icon="code" href="/building-skills/skill-package-format">
     All declared `tool_files` exist and are readable as UTF-8.
   </Card>
-  <Card title="Asset files" icon="photo-film">
+  <Card title="Asset files" icon="photo-film" href="/building-skills/skill-package-format">
     All declared `asset_files` exist and have safe relative paths.
   </Card>
-  <Card title="Wrapper directory detection" icon="folder-xmark">
+  <Card title="Wrapper directory detection" icon="folder-xmark" href="/building-skills/packaging">
     The ZIP is checked for a single wrapper directory surrounding the package contents. Wrapper directories are a hard fail.
   </Card>
-  <Card title="Unsafe path detection" icon="triangle-exclamation">
+  <Card title="Unsafe path detection" icon="triangle-exclamation" href="/reference/path-rules">
     Absolute paths, `..` segments, drive letters, backslash paths, and empty path segments are all rejected.
   </Card>
-  <Card title="Nested ZIP detection" icon="file-zipper">
+  <Card title="Nested ZIP detection" icon="file-zipper" href="/building-skills/packaging">
     No `.zip` file may appear inside a built package.
   </Card>
 </CardGroup>

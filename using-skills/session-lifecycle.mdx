@@ -25,7 +25,7 @@ When `SKILL CORE UNPACK` runs it performs these steps in order:
     `/mnt/data/GPT.SKILLS/SYSTEM_CORE/MANIFEST.json` is read and validated. Required fields, types, `system_name`, `version`, path safety, and the `load_sequence` are all checked mechanically.
   </Step>
   <Step title="Mount the core load-sequence files">
-    Each file declared in `load_sequence` — `ENTRY.md`, `README.md`, `SEMANTICS.md`, and `OPERATIONAL_RULES.md` — is read and validated. Required files are confirmed as UTF-8 text. Optional files produce a degraded-load warning if missing or unreadable, but do not block activation.
+    Each file declared in `load_sequence` — `ENTRY.md`, `README.md`, `SEMANTICS.md`, and `OPERATIONAL_RULES.md` — is read and validated as a required UTF-8 text file. All four are required; a missing or unreadable file in `load_sequence` causes a hard fail.
   </Step>
   <Step title="Activate the core">
     The core becomes semantically active for the current session. Lifecycle commands are now recognized and validated according to the rules in `OPERATIONAL_RULES.md`.
@@ -37,16 +37,16 @@ When `SKILL CORE UNPACK` runs it performs these steps in order:
 The four files mounted during core boot form the active semantic perimeter of the system. Each has a distinct role.
 
 <CardGroup cols={2}>
-  <Card title="ENTRY.md" icon="door-open" href="#the-core-runtime-files">
+  <Card title="ENTRY.md" icon="door-open" href="/using-skills/session-lifecycle">
     The bootstrap and activation entry point. Defines what activation means, what the session boundary is, and where command authority lives. It is the `primary_file` in the core manifest.
   </Card>
-  <Card title="README.md" icon="book-open" href="#the-core-runtime-files">
+  <Card title="README.md" icon="book-open" href="/using-skills/session-lifecycle">
     The system overview. Describes what the skill system is for, what it does, and what it does not do. Contains no operational rules or lifecycle commands.
   </Card>
-  <Card title="SEMANTICS.md" icon="brain" href="#the-core-runtime-files">
+  <Card title="SEMANTICS.md" icon="brain" href="/using-skills/session-lifecycle">
     The mental model. Defines session-first thinking, what "active" means, the cooperative composition principle, and the boundary of change. Does not define command lifecycle or manifest validation.
   </Card>
-  <Card title="OPERATIONAL_RULES.md" icon="list-check" href="#the-core-runtime-files">
+  <Card title="OPERATIONAL_RULES.md" icon="list-check" href="/reference/commands">
     The command lifecycle and validation rulebook. Defines `SKILL CORE UNPACK`, `SKILL <name> UNPACK`, and `SKILL <name> LOAD` behavior in full, including hard-fail conditions, manifest validation rules, path policy, and runtime limits.
   </Card>
 </CardGroup>

@@ -126,22 +126,22 @@ Do not add global system rules, loader lifecycle rules, or bootstrap logic to th
 These are the most common adaptation anti-patterns. Each one adds accidental complexity or breaks the preservation-first contract.
 
 <CardGroup cols={2}>
-  <Card title="Rewriting into a framework" icon="triangle-exclamation">
+  <Card title="Rewriting into a framework" icon="triangle-exclamation" href="/building-skills/adapting-a-skill">
     Do not rewrite the skill's text into a mini-framework with its own routing, phases, or command syntax. Preserve the original skill body.
   </Card>
-  <Card title="Reorganizing folders" icon="triangle-exclamation">
+  <Card title="Reorganizing folders" icon="triangle-exclamation" href="/building-skills/adapting-a-skill">
     Do not move files into a system-specific folder taxonomy (`core/`, `lifecycle/`, and so on). Keep the original folder names unless safety requires a change.
   </Card>
-  <Card title="Adding bootstrap rules" icon="triangle-exclamation">
+  <Card title="Adding bootstrap rules" icon="triangle-exclamation" href="/building-skills/adapting-a-skill">
     Do not add initialization logic or boot sequences to skill files. Boot behavior belongs to the core, not to skills.
   </Card>
-  <Card title="Adding lifecycle rules" icon="triangle-exclamation">
+  <Card title="Adding lifecycle rules" icon="triangle-exclamation" href="/building-skills/adapting-a-skill">
     Do not embed `UNPACK`/`LOAD`/`UNLOAD` lifecycle instructions inside skill content. The loader already knows the lifecycle.
   </Card>
-  <Card title="Duplicating core behavior" icon="triangle-exclamation">
+  <Card title="Duplicating core behavior" icon="triangle-exclamation" href="/building-skills/adapting-a-skill">
     Do not copy core operational rules into the skill. If a behavior is defined by the core, the skill must not redefine or override it.
   </Card>
-  <Card title="Marketplace assumptions" icon="triangle-exclamation">
+  <Card title="Marketplace assumptions" icon="triangle-exclamation" href="/building-skills/adapting-a-skill">
     Do not add auto-install logic, marketplace references, or dependency resolution to skill content. Skills are installed manually through explicit commands.
   </Card>
 </CardGroup>
