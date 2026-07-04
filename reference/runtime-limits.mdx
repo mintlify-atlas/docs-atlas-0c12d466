@@ -1,0 +1,124 @@
+---
+title: "GPT Project Skill System runtime limits and boundaries"
+sidebarTitle: "Runtime Limits"
+description: "Explicit list of what the GPT Project Skill System does not provide, including hooks, persistent state, routing, and dependency management."
+---
+
+The GPT Project Skill System is intentionally minimal. The runtime limits described on this page define the boundary between what the system provides and what falls entirely outside it. Reading these limits before building or deploying skills prevents incorrect assumptions about system behavior and avoids designing around capabilities that do not exist.
+
+## Session and activation limits
+
+The active skill set exists **only inside the current chat session**. Nothing carries over to a new chat automatically.
+
+- **Core unpack resets the session.** Rerunning `SKILL CORE UNPACK` in the same chat resets the active semantic state and clears all previously loaded skills. Skills installed under `SKILLS/` are no longer considered active after core unpack completes.
+- **Installed is not active.** A skill folder present under `/mnt/data/GPT.SKILLS/SKILLS/` is physically installed. It is not semantically active. The model cannot infer skill capability from installed-but-not-loaded packages. Only `SKILL <name> LOAD` makes an installed skill active.
+- **No carry-over between chats.** When a chat ends, the active session ends. Opening a new chat requires a fresh boot and load cycle.
+- **No pre-scan.** Skill ZIPs present in Project sources are inert. They produce no capability, no context injection, and no pre-validation until an explicit `SKILL <name> UNPACK` is issued.
+
+---
+
+## What the runtime does not provide
+
+The following capabilities are explicitly **outside** the system boundary.
+
+### No hooks
+
+The runtime provides no pre-load hooks, post-load hooks, event hooks, or lifecycle hooks of any kind. No file or manifest field creates binding behavior on a lifecycle event.
+
+### No watcher behavior
+
+There are no file watchers and no directory watchers. Changes to files under `/mnt/data/GPT.SKILLS/` after a session is active do not trigger any automatic re-read or re-mount.
+
+### No persistent runtime state
+
+Runtime state exists only in the current session context. There is no serialized state, no database, no persistent enforcement layer, and no state that survives across chats.
+
+### No automatic routing
+
+Incoming requests are not automatically routed to skills. Active skills provide semantic context that the model weighs against the current task — they do not intercept, filter, or redirect requests.
+
+### No install into the model
+
+Skill activation is session-scoped, not model-scoped. Loading a skill does not install anything into the base model, does not modify model weights, and does not persist outside the current chat context.
+
+### No marketplace behavior
+
+The system provides no auto-discovery, no auto-install, no skill registry, and no catalog of available skills. Skills are explicitly managed by the user through the three lifecycle commands.
+
+### No internet auto-install
+
+No `pip install`, no network install, and no package download occurs during skill unpack or load. Tool files may only use the Python standard library or packages already available in the current GPT Python environment.
+
+### No automatic tool execution
+
+`tool_files` declared in a skill manifest are physically available after unpack. They are never mounted automatically and never executed automatically. Execution requires an explicit request during the session.
+
+### No pre-scan of skill ZIPs
+
+Skill ZIP files present among Project sources are inert. The runtime must not pre-scan, pre-validate, compile, or infer capability from any skill package that was not named by an explicit lifecycle command.
+
+### No dependency management
+
+`capabilities` and `runtime_hints` in a skill manifest are lightweight descriptive metadata. They do not create dependency management, authorization, routing, validation guarantees, or automatic tool access. See [Manifest metadata limits](#manifest-metadata-limits) below.
+
+---
+
+## Tool file limits
+
+Tool files may use only the **Python standard library** or packages already available in the current GPT Python environment at the time of execution.
+
+- No `pip install` is permitted.
+- No network install is permitted.
+- If a required package is missing from the environment, tool execution degrades or fails with a warning.
+- Skills should provide a non-script fallback when possible so the session remains useful even when a tool dependency is unavailable.
+
+<Info>
+  Tool files are declared in `tool_files` in the skill manifest. They are never run automatically. They are physically available under the installed skill directory after unpack and can be invoked explicitly during the session.
+</Info>
+
+---
+
+## Manifest metadata limits
+
+The `capabilities` and `runtime_hints` fields in a skill manifest are **descriptive metadata only**. They communicate intent to human readers and tooling; they do not create any runtime behavior.
+
+Specifically, these fields do **not** create:
+
+| Field | What it does NOT create |
+|---|---|
+| `capabilities` | Dependency management, authorization, routing |
+| `runtime_hints` | Validation guarantees, automatic tool access |
+| Both | Any control-plane behavior |
+
+Invalid metadata types (wrong JSON type for the field) produce a warning and are ignored. They do not hard-fail load because they do not affect mount behavior. Unknown manifest fields are similarly ignored or warned and are never mounted.
+
+---
+
+## Skill composition limits
+
+Multiple skills can be active cooperatively in the same session when they support the same work focus. The model weighs the active skill pool against the current task. However, composition has practical limits:
+
+- **Loading too many skills degrades focus.** Excess active context makes the model less focused on any individual skill. Load only the skills relevant to the current task. When the work focus changes materially, open a new chat and run a targeted boot and load cycle.
+- **Skills must not redefine global core behavior.** A skill may define local capability, input/output handling, and optional local hints. It must not declare alternate lifecycle rules, global mount order, or global core overrides.
+- **`load_sequence` and `support_files` must not overlap.** If a reference file should always be active, declare it in `load_sequence`. If it should be available only when needed, declare it in `support_files`. Overlap between the two fields is a hard fail at build and runtime.
+
+<Tip>
+  The session-first model is a feature, not a limitation. By keeping the active semantic set small, focused, and predictable — and by closing a session when the work focus changes — you maintain sharp, coherent context instead of an ever-growing pile of loaded skills that dilute each other.
+</Tip>
+
+---
+
+<CardGroup cols={2}>
+  <Card title="Mental Model" icon="brain" href="/concepts">
+    How session-first activation and cooperative composition work.
+  </Card>
+  <Card title="Commands" icon="terminal" href="/reference/commands">
+    Full reference for SKILL CORE UNPACK, SKILL UNPACK, and SKILL LOAD.
+  </Card>
+  <Card title="Manifest Reference" icon="file-lines" href="/building-skills/manifest-reference">
+    Every manifest field, type, and validation rule.
+  </Card>
+  <Card title="Session Lifecycle" icon="arrows-rotate" href="/using-skills/session-lifecycle">
+    How to open, boot, load, compose, and close a skill session.
+  </Card>
+</CardGroup>

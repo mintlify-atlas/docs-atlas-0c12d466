@@ -1,0 +1,212 @@
+---
+title: "Skill package format: ZIP structure and file categories"
+sidebarTitle: "Package Format"
+description: "Reference for the GPT Project Skill System skill package ZIP format, including fallback and explicit manifest modes and the four file categories."
+---
+
+A skill package is a flat ZIP file containing a `MANIFEST.json` at the root and one or more declared skill files. The manifest identifies the skill, declares the entry point, and maps every file into one of four functional categories. The loader reads `MANIFEST.json` first and uses it to drive all subsequent unpack and mount behavior.
+
+## Two package modes
+
+The presence or absence of `primary_file` and `load_sequence` in the manifest controls which loading mode the runtime uses.
+
+### Fallback mode
+
+When the manifest omits both `primary_file` and `load_sequence`, the loader applies fallback defaults:
+
+```json
+{
+  "primary_file": "SKILL.md",
+  "load_sequence": ["SKILL.md"]
+}
+```
+
+Use fallback mode when the root `SKILL.md` is the only entry point and no extra mounted files are needed. It is the simplest possible shape.
+
+**Fallback manifest:**
+
+```json
+{
+  "skill_name": "summarizer",
+  "version": "1.0"
+}
+```
+
+**Fallback file tree:**
+
+```text
+summarizer.zip
+  MANIFEST.json
+  SKILL.md
+```
+
+<Note>
+  Root `SKILL.md` is required in fallback mode. If you use explicit manifest
+  mode, `SKILL.md` at the root is not required — your `primary_file` may be any
+  safe relative UTF-8 textual file.
+</Note>
+
+### Explicit manifest mode
+
+When the manifest declares both `primary_file` and `load_sequence`, the loader uses those values directly. Use explicit mode when the entry point is nested, when extra mounted files are needed, or when you want unambiguous declaration of what gets loaded.
+
+**Explicit manifest:**
+
+```json
+{
+  "skill_name": "csv-profiler",
+  "version": "1.0",
+  "primary_file": "SKILL.md",
+  "load_sequence": ["SKILL.md"],
+  "support_files": ["docs/columns.md"],
+  "tool_files": ["tools/profile_csv.py"],
+  "asset_files": ["templates/template.csv"]
+}
+```
+
+**Explicit file tree:**
+
+```text
+csv-profiler.zip
+  MANIFEST.json
+  SKILL.md
+  docs/
+    columns.md
+  tools/
+    profile_csv.py
+  templates/
+    template.csv
+```
+
+<Warning>
+  Providing only one of `primary_file` or `load_sequence` is a hard-fail
+  validation error. Both must be present or both must be omitted — there is no
+  partial declaration.
+</Warning>
+
+## ZIP structure rules
+
+The ZIP must be **flat at root**: `MANIFEST.json` must appear directly inside the ZIP with no surrounding wrapper directory. Internal subfolders are permitted as long as their paths are safe.
+
+**Valid structure:**
+
+```text
+csv-profiler.zip
+  MANIFEST.json          ← at ZIP root
+  SKILL.md
+  docs/
+    columns.md           ← safe internal folder, allowed
+  tools/
+    profile_csv.py
+  templates/
+    template.csv
+```
+
+**Invalid — wrapper directory:**
+
+```text
+csv-profiler.zip
+  csv-profiler/          ← single wrapper folder, hard fail
+    MANIFEST.json
+    SKILL.md
+```
+
+Additional packaging rules enforced at build and unpack time:
+
+- All ZIP entry paths must use POSIX `/` separators — backslashes (`\`) in any entry name are a hard fail.
+- Nested ZIP files inside a skill package are not allowed.
+- Every declared file path must be a file target, not a directory.
+
+## File categories
+
+Every file in a skill package falls into one of four functional categories, each with distinct mount and availability semantics.
+
+### `load_sequence`
+
+Files in `load_sequence` are semantically mounted into the active skill context during `SKILL <name> LOAD`. They are the only files that become active context automatically.
+
+- Must include `primary_file`.
+- All entries must be AI-only UTF-8 textual files (`.md`, `.txt`, and similar text formats).
+- Must not include scripts, executables, or binary assets.
+- May include nested files with safe relative paths (for example, `docs/intro.md`).
+- Every entry must exist in the ZIP and must be a file target, not a directory.
+
+### `support_files`
+
+Support files are supplemental reference files. They are physically available after unpack but are **not** mounted into the active context automatically — they are consulted only when needed.
+
+- Every entry must be a safe relative path and must exist after unpack.
+- Must not overlap with `load_sequence` (overlap is a hard fail).
+- Use `support_files` for reference material that should be reachable but should not pollute the automatic context.
+
+### `tool_files`
+
+Tool files are Python scripts physically available to the Python environment after unpack. They are **never** mounted and **never** run automatically.
+
+- Every entry must exist, be a file target, and be readable as UTF-8.
+- Tool files may use only Python standard library or packages already available in the current GPT Python environment.
+- `pip install` and network installs are prohibited. If a dependency is missing, the tool must degrade or fail with a clear warning.
+- The skill should provide a non-script fallback where possible.
+
+### `asset_files`
+
+Asset files are data, template, media, or other physical files that the task environment can use directly. They are **never** mounted automatically.
+
+- Every entry must be a safe relative path and must exist after unpack.
+- May be non-textual when the environment can consume them as files (for example, CSV templates, images).
+
+## Name identity rule
+
+The skill name must be consistent across all four locations. A mismatch at any point is a hard fail.
+
+| Location | Must equal |
+|---|---|
+| Command slug | `skill_name` |
+| ZIP filename | `<skill_name>.zip` |
+| Installed folder | `/mnt/data/GPT.SKILLS/SKILLS/<skill_name>/` |
+| `skill_name` in `MANIFEST.json` | the slug |
+
+**Example — consistent identity:**
+
+```text
+SKILL summarizer UNPACK    ← command slug: summarizer
+summarizer.zip             ← ZIP filename matches
+/mnt/data/GPT.SKILLS/SKILLS/summarizer/   ← installed folder matches
+```
+
+```json
+{
+  "skill_name": "summarizer",
+  "version": "1.0"
+}
+```
+
+The `skill_name` must also match the pattern `^[a-z0-9_-]+$`. Spaces, uppercase letters, dots, slashes, and `..` are all invalid slugs.
+
+## Full manifest example
+
+The following is the complete manifest for the `csv-profiler` skill demonstrating all four file categories and optional metadata fields:
+
+```json
+{
+  "skill_name": "csv-profiler",
+  "version": "1.0",
+  "primary_file": "SKILL.md",
+  "load_sequence": [
+    "SKILL.md"
+  ],
+  "support_files": [
+    "docs/columns.md"
+  ],
+  "tool_files": [
+    "tools/profile_csv.py"
+  ],
+  "asset_files": [
+    "templates/template.csv"
+  ],
+  "capabilities": ["csv analysis"],
+  "runtime_hints": {
+    "uses_python": true
+  }
+}
+```

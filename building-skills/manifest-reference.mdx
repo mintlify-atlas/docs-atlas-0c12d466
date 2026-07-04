@@ -1,0 +1,145 @@
+---
+title: "MANIFEST.json field reference for skill packages"
+sidebarTitle: "Manifest Reference"
+description: "Complete reference for every MANIFEST.json field in GPT Project Skill System skill packages, including required and optional fields with types and validation rules."
+---
+
+`MANIFEST.json` is the identity and configuration file for every skill package. Every skill package must include one at the ZIP root — it is the first thing the loader reads during both `SKILL <name> UNPACK` and `SKILL <name> LOAD`. The manifest drives validation, physical unpack behavior, and semantic mount behavior. Without a valid `MANIFEST.json`, the skill cannot be installed or loaded.
+
+## Required fields
+
+<ParamField path="skill_name" type="string" required>
+  The canonical name of the skill. Must match the pattern `^[a-z0-9_-]+$` — lowercase letters, digits, hyphens, and underscores only. Must exactly equal the command slug, the ZIP filename (without `.zip`), and the installed folder name under `/mnt/data/GPT.SKILLS/SKILLS/`. A mismatch at any of those four locations is a hard fail.
+
+  **Valid examples:** `summarizer`, `legal-review`, `csv_profiler`
+
+  **Invalid examples:** `My Skill` (space), `Summarizer` (uppercase), `skill.name` (dot), `../x` (traversal)
+</ParamField>
+
+<ParamField path="version" type="string" required>
+  A non-empty string that identifies the skill version. No specific format is enforced — `"1.0"`, `"0.1.0"`, and `"2024-06"` are all acceptable. An empty string or a missing field is a hard fail.
+</ParamField>
+
+## Load behavior fields
+
+`primary_file` and `load_sequence` form a pair. Both must be present or both must be omitted. Providing only one is a hard fail.
+
+<ParamField path="primary_file" type="string">
+  Safe relative path to the skill's entry point file. Must be included in `load_sequence`. When both `primary_file` and `load_sequence` are omitted, the loader falls back to `"SKILL.md"` for this field. Required if `load_sequence` is present.
+</ParamField>
+
+<ParamField path="load_sequence" type="string[]">
+  Ordered list of safe relative UTF-8 textual files to mount semantically during `SKILL <name> LOAD`. These are the only files that become active context automatically. Must include `primary_file`. Must not include scripts or binary assets. Must not overlap with `support_files`. Required if `primary_file` is present.
+
+  When both `primary_file` and `load_sequence` are omitted, the loader falls back to `["SKILL.md"]` for this field.
+</ParamField>
+
+## Physical availability fields
+
+These fields declare files that are extracted from the ZIP and physically available after `SKILL <name> UNPACK`, but are not automatically mounted into the active context.
+
+<ParamField path="support_files" type="string[]">
+  Supplemental reference files consulted only when needed. Physically available after unpack but not mounted automatically. Must not overlap with `load_sequence` — overlap is a hard fail. Every entry must be a safe relative path pointing to an existing file target.
+</ParamField>
+
+<ParamField path="tool_files" type="string[]">
+  Python-compatible scripts physically available to the Code Interpreter environment after unpack. Never mounted and never run automatically. Every entry must be a safe relative path, must exist, and must be readable as UTF-8. Tool files may only use Python standard library or packages already available in the GPT Python environment — `pip install` and network installs are prohibited. If a required package is missing, tool execution must degrade or fail with a clear warning.
+</ParamField>
+
+<ParamField path="asset_files" type="string[]">
+  Data, template, or media files physically available after unpack. Never mounted automatically. May be non-textual when the environment can use them as files (for example, CSV templates, images). Every entry must be a safe relative path pointing to an existing file target.
+</ParamField>
+
+## Metadata fields
+
+These fields are descriptive only. They carry no runtime enforcement and do not alter mount behavior.
+
+<ParamField path="capabilities" type="string[]">
+  Lightweight human-readable descriptions of what the skill can do. Examples: `["csv analysis", "column profiling"]`. No format is enforced. Does not create routing, authorization, or validation guarantees.
+</ParamField>
+
+<ParamField path="runtime_hints" type="object">
+  Lightweight hints about the skill's runtime context. Example: `{"uses_python": true, "output": "structured report"}`. Does not create dependency management, authorization, routing, or validation guarantees. Keep it lightweight — do not use `runtime_hints` to express behavior the loader cannot mechanically verify.
+</ParamField>
+
+<Note>
+  Unknown manifest fields are ignored or warned at load time. They are never
+  mounted and do not affect skill behavior. Unknown fields do not cause a hard
+  fail — only explicitly invalid fields do.
+</Note>
+
+## Validation rules
+
+The following conditions cause a hard fail during unpack or load. A hard fail stops the operation immediately with an error message.
+
+<CardGroup cols={2}>
+  <Card title="Missing required field" icon="circle-xmark">
+    Either `skill_name` or `version` is absent from the manifest.
+  </Card>
+  <Card title="Invalid skill_name" icon="circle-xmark">
+    `skill_name` does not match `^[a-z0-9_-]+$`, is empty, or does not match the ZIP filename, command slug, or installed folder.
+  </Card>
+  <Card title="Empty version" icon="circle-xmark">
+    `version` is present but is an empty string.
+  </Card>
+  <Card title="primary_file not in load_sequence" icon="circle-xmark">
+    `primary_file` is declared but the value is not listed in `load_sequence`.
+  </Card>
+  <Card title="Partial load pair" icon="circle-xmark">
+    Exactly one of `primary_file` or `load_sequence` is present. Both must be provided or both must be omitted.
+  </Card>
+  <Card title="load_sequence / support_files overlap" icon="circle-xmark">
+    A path appears in both `load_sequence` and `support_files`.
+  </Card>
+  <Card title="Unsafe paths" icon="circle-xmark">
+    Any declared path is absolute, contains `..`, uses backslashes, contains empty segments, or contains a drive letter.
+  </Card>
+  <Card title="Script or binary in load_sequence" icon="circle-xmark">
+    A file with an executable or binary extension (`.py`, `.sh`, `.js`, `.exe`, and similar) appears in `load_sequence`.
+  </Card>
+</CardGroup>
+
+## Complete examples
+
+### Minimal fallback manifest
+
+The simplest valid manifest — `SKILL.md` at the ZIP root is used as both `primary_file` and the sole `load_sequence` entry by fallback:
+
+```json
+{
+  "skill_name": "summarizer",
+  "version": "1.0"
+}
+```
+
+### Full explicit manifest
+
+All fields declared explicitly, including all four file categories and optional metadata:
+
+```json
+{
+  "skill_name": "csv-profiler",
+  "version": "1.0",
+  "primary_file": "SKILL.md",
+  "load_sequence": [
+    "SKILL.md"
+  ],
+  "support_files": [
+    "docs/columns.md"
+  ],
+  "tool_files": [
+    "tools/profile_csv.py"
+  ],
+  "asset_files": [
+    "templates/template.csv"
+  ],
+  "capabilities": [
+    "csv analysis",
+    "column profiling"
+  ],
+  "runtime_hints": {
+    "uses_python": true,
+    "output": "structured csv report"
+  }
+}
+```

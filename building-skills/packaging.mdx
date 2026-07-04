@@ -1,0 +1,156 @@
+---
+title: "Building and validating skill packages with build_packages.py"
+sidebarTitle: "Packaging"
+description: "Use the build_packages.py script to create and validate GPT.SKILLS.zip and skill ZIPs with correct POSIX paths and no wrapper directories."
+---
+
+The repository includes `scripts/build_packages.py`, a Python build script that creates and validates the core package and all skill packages in a single run. It enforces ZIP structure rules, POSIX path separator requirements, path safety, and manifest correctness before writing any output to `dist/`. If any validation step fails, the script exits immediately with a descriptive error — no partial output is written.
+
+## Running the build
+
+From the repository root, run:
+
+```bash
+python scripts/build_packages.py
+```
+
+On a successful build, the script prints one line per package written:
+
+```text
+built dist/GPT.SKILLS.zip
+built dist/skills/skill-adapter.zip
+```
+
+No output is written until all validations pass for a given package.
+
+## What the build script does
+
+The script processes the core and all skills in a fixed sequence:
+
+<Steps>
+  <Step title="Build the core package">
+    Reads the `GPT.SKILLS/` source directory and packages it as `dist/GPT.SKILLS.zip`. The ZIP must have `SYSTEM_CORE/` and `SKILLS/` at its root — there must be no `GPT.SKILLS/` wrapper folder inside the archive. The script validates the core manifest, required file presence, UTF-8 readability, load sequence, and POSIX path separators.
+  </Step>
+  <Step title="Build each skill package">
+    For each subdirectory under `skill_sources/` that contains a `MANIFEST.json`, the script reads and validates the manifest, then packages the skill as `dist/skills/<skill_name>.zip`. The source folder name must match `skill_name` in the manifest.
+  </Step>
+  <Step title="Write with POSIX path separators">
+    All ZIP entries are written using POSIX `/` path separators. Backslashes (`\`) in any entry name are a hard fail. The script calls `.as_posix()` on every path before writing it to the archive.
+  </Step>
+  <Step title="Validate each ZIP after writing">
+    After writing each ZIP, the script reopens it and validates the archive again — checking entry names, manifest fields, wrapper directory detection, and nested ZIP detection. This post-write check catches any discrepancy between source validation and the written archive.
+  </Step>
+</Steps>
+
+## What is validated
+
+The build script performs the following checks for every package it builds. Any failure is a hard stop.
+
+<CardGroup cols={2}>
+  <Card title="Package shape" icon="folder-check">
+    The ZIP root contents match the expected layout — `SYSTEM_CORE/` and `SKILLS/` for the core; `MANIFEST.json` at root for skills.
+  </Card>
+  <Card title="ZIP path separators" icon="slash">
+    Every ZIP entry uses POSIX `/` separators. Any entry containing `\` causes an immediate failure.
+  </Card>
+  <Card title="Manifest fields" icon="file-check">
+    Required fields are present and have the correct types. `system_name` and `version` are validated against exact expected values for the core.
+  </Card>
+  <Card title="Load files" icon="file-lines">
+    All files in `load_sequence` exist, are readable as UTF-8, and are not scripts or binary assets.
+  </Card>
+  <Card title="Support files" icon="file">
+    All declared `support_files` exist and have safe relative paths.
+  </Card>
+  <Card title="Tool files" icon="code">
+    All declared `tool_files` exist and are readable as UTF-8.
+  </Card>
+  <Card title="Asset files" icon="photo-film">
+    All declared `asset_files` exist and have safe relative paths.
+  </Card>
+  <Card title="Wrapper directory detection" icon="folder-xmark">
+    The ZIP is checked for a single wrapper directory surrounding the package contents. Wrapper directories are a hard fail.
+  </Card>
+  <Card title="Unsafe path detection" icon="triangle-exclamation">
+    Absolute paths, `..` segments, drive letters, backslash paths, and empty path segments are all rejected.
+  </Card>
+  <Card title="Nested ZIP detection" icon="file-zipper">
+    No `.zip` file may appear inside a built package.
+  </Card>
+</CardGroup>
+
+## Repository layout
+
+```text
+GPT.SKILLS/
+  SYSTEM_CORE/
+  SKILLS/
+
+skill_sources/
+  skill-adapter/
+
+dist/
+  GPT.SKILLS.zip
+  skills/
+    skill-adapter.zip
+
+docs/
+  ADAPTING_A_SKILL.md
+  PACKAGING.md
+  SKILL_PACKAGE_FORMAT.md
+
+scripts/
+  build_packages.py
+```
+
+The `dist/` directory is the build output directory. It is created automatically on the first build run. The `GPT.SKILLS/` and `skill_sources/` directories are the source inputs — never edit files in `dist/` directly.
+
+## Adding your own skills
+
+To include a new skill in the build:
+
+1. Create a folder under `skill_sources/<skill-name>/`. The folder name must match the `skill_name` you intend to use.
+2. Add `MANIFEST.json` with at minimum `skill_name` and `version`.
+3. Add your skill files — at minimum `SKILL.md` for fallback mode, or the file declared as `primary_file` for explicit mode.
+4. Run the build:
+
+   ```bash
+   python scripts/build_packages.py
+   ```
+
+The built ZIP appears at `dist/skills/<skill-name>.zip`. If validation fails, the script prints the specific error and exits before writing any output for that skill.
+
+## Core ZIP structure
+
+<Warning>
+  The most common packaging mistake is creating a ZIP with a wrapper directory.
+  If you zip the `GPT.SKILLS/` folder itself rather than its contents, the
+  archive root will contain `GPT.SKILLS/` — and when the runtime extracts it,
+  the paths resolve to `/mnt/data/GPT.SKILLS/GPT.SKILLS/SYSTEM_CORE/`, which is
+  invalid. Always zip the **contents** of `GPT.SKILLS/`, not the folder.
+</Warning>
+
+`SKILL CORE UNPACK` extracts `GPT.SKILLS.zip` into `/mnt/data/GPT.SKILLS/`. For the extracted tree to be valid, the ZIP must contain `SYSTEM_CORE/` and `SKILLS/` directly at its root — not wrapped in a parent folder.
+
+**Valid core ZIP root:**
+
+```text
+GPT.SKILLS.zip
+  SYSTEM_CORE/       ← at ZIP root
+    MANIFEST.json
+    ENTRY.md
+    ...
+  SKILLS/            ← at ZIP root
+    README.md
+```
+
+**Invalid core ZIP root:**
+
+```text
+GPT.SKILLS.zip
+  GPT.SKILLS/        ← wrapper folder, hard fail
+    SYSTEM_CORE/
+    SKILLS/
+```
+
+The build script enforces this rule automatically — it will fail with `"core ZIP contains GPT.SKILLS wrapper"` if the wrapper is detected. The same no-wrapper rule applies to all skill ZIPs: `MANIFEST.json` must appear at the skill ZIP root, never inside a subfolder named after the skill.

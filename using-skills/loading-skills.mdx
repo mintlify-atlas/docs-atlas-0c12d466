@@ -1,0 +1,129 @@
+---
+title: "Load and manage skills in a ChatGPT Project session"
+sidebarTitle: "Loading Skills"
+description: "Step-by-step guide to unpacking and loading skills during a GPT Project session, including multiple skills and reload behavior."
+---
+
+Activating a skill in a GPT Project session is a deliberate two-step process: **unpack**, then **load**. Unpack installs the skill's files physically into the runtime environment. Load reads those files and makes the skill semantically active in the current chat. Neither step happens automatically — a skill ZIP present in your Project is completely inert until you explicitly run both commands.
+
+<Note>
+  Skill ZIPs uploaded to a ChatGPT Project are inert by default. The system does not pre-scan, pre-validate, or auto-load any skill package. A skill becomes active only after an explicit `SKILL <name> UNPACK` followed by `SKILL <name> LOAD`.
+</Note>
+
+## Unpacking a skill
+
+The `SKILL <name> UNPACK` command installs a skill package physically into the skill directory. It does not make the skill active.
+
+When you run `SKILL <name> UNPACK`, the runtime:
+
+1. Validates `<name>` against the slug rules (see [Slug rules](#slug-rules) below).
+2. Verifies that the skill ZIP filename in the Project sources is exactly `<name>.zip`.
+3. Verifies that the ZIP contains a root `MANIFEST.json` with no single wrapper directory surrounding the package.
+4. Verifies that the `skill_name` field inside the manifest equals `<name>`.
+5. Extracts the ZIP into `/mnt/data/GPT.SKILLS/SKILLS/<name>/`, overwriting any previously extracted copy for the same skill name.
+
+**Example:**
+
+```text
+SKILL skill-adapter UNPACK
+```
+
+After this command succeeds, the skill's files are physically present at `/mnt/data/GPT.SKILLS/SKILLS/skill-adapter/`. The skill is installed but not yet active. No instructions have been read. No capabilities have been enabled.
+
+## Loading a skill
+
+The `SKILL <name> LOAD` command mounts an already-installed skill and makes it semantically active for the current session.
+
+When you run `SKILL <name> LOAD`, the runtime:
+
+1. Confirms the skill has already been unpacked into `/mnt/data/GPT.SKILLS/SKILLS/<name>/`. It does **not** auto-unpack.
+2. Reads the skill's `MANIFEST.json`.
+3. Reads and validates every file in the manifest's `load_sequence`. If the manifest omits `primary_file` and `load_sequence`, the loader falls back to reading root `SKILL.md`.
+4. Makes the skill semantically active — the model treats the mounted files as live context for the session.
+
+**Example:**
+
+```text
+SKILL skill-adapter LOAD
+```
+
+After this command succeeds, the skill is active. Its declared `load_sequence` files have been read and the model uses them when relevant to the current task.
+
+## Alternative syntax
+
+Both commands also accept natural language phrasing. These are equivalent to the structured commands above:
+
+```text
+Unpack the skill-adapter skill.
+Load the skill-adapter skill.
+```
+
+Use whichever form feels natural for your workflow. The structured `SKILL <name> UNPACK` / `SKILL <name> LOAD` form is recommended when precision matters or when scripting a session opening sequence.
+
+## Loading multiple skills
+
+Multiple skills can be active in the same session as long as they support the same work focus. Load them one at a time:
+
+```text
+SKILL skill-adapter UNPACK
+SKILL skill-adapter LOAD
+
+SKILL my-other-skill UNPACK
+SKILL my-other-skill LOAD
+```
+
+Active skills compose **cooperatively**, not sequentially. The model weighs the entire pool of active skills against the current task and applies whichever skill or combination of skills is most relevant. There is no routing layer and no priority queue — the model uses judgment.
+
+<Note>
+  Keep the active skill set small and focused. Loading skills "just in case" adds semantic noise and degrades task focus. Load only the skills your current work actually requires.
+</Note>
+
+## Reloading a skill
+
+Running `SKILL <name> LOAD` for a skill that is already active performs a **full semantic reload** of that skill. The runtime re-reads the manifest and all `load_sequence` files from scratch.
+
+This is useful if you have re-unpacked the skill during the same session (for example, after modifying and re-uploading the ZIP) and want the updated content to take effect without opening a new chat.
+
+```text
+SKILL skill-adapter UNPACK
+SKILL skill-adapter LOAD
+```
+
+## Slug rules
+
+The `<name>` argument in every skill command must be a valid slug. The slug is the canonical identity of the skill — it must match the ZIP filename, the `skill_name` in the manifest, and the installed folder path.
+
+**Allowed characters:**
+
+```text
+a-z  0-9  _  -
+```
+
+**Rules:**
+- Must not be empty.
+- No uppercase letters.
+- No spaces.
+- No dots (`.`).
+- No forward slashes (`/`) or backslashes (`\`).
+- No path traversal sequences (`..`).
+
+**Valid slug examples:**
+
+```text
+skill-adapter
+my-skill
+code_review
+v2-helper
+```
+
+**Invalid slug examples:**
+
+```text
+Skill-Adapter      ← uppercase letters
+my skill           ← contains a space
+my.skill           ← contains a dot
+../skill           ← path traversal
+skills/adapter     ← contains a slash
+```
+
+A hard fail is raised immediately if `<name>` violates any of these rules.

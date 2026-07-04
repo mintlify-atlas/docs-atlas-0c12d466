@@ -1,0 +1,116 @@
+---
+title: "Managing your skill session lifecycle in ChatGPT Projects"
+sidebarTitle: "Session Lifecycle"
+description: "Learn how to boot the GPT Project Skill System core, load skills, and reset your session when your work focus changes."
+---
+
+A **session** is the operating unit of the GPT Project Skill System. Every skill you load, every capability you activate, and every semantic rule you bring into play exists only for the duration of the current chat. When the chat closes, the active skill set is gone — nothing persists into the next conversation. Understanding this boundary lets you design focused, purposeful sessions rather than accumulating stale context across unrelated tasks.
+
+## Booting the core
+
+Before any skill can be loaded, the system core must be unpacked and activated. This happens through the `SKILL CORE UNPACK` command.
+
+You do not have to type this yourself on the first turn. The `CUSTOM_INSTRUCTIONS.txt` file — added to your Project's custom instructions during setup — tells ChatGPT to run core unpack automatically at the start of each new chat in the Project.
+
+When `SKILL CORE UNPACK` runs it performs these steps in order:
+
+<Steps>
+  <Step title="Remove the previous core">
+    Any existing `/mnt/data/GPT.SKILLS/` directory is deleted. Any legacy `/mnt/data/sistema_madre/` directory is also removed. This guarantees a clean slate before extraction.
+  </Step>
+  <Step title="Extract the core package">
+    `GPT.SKILLS.zip` is extracted into `/mnt/data/GPT.SKILLS/`. The ZIP must produce exactly this root — a hard fail is raised if any other root path is produced.
+  </Step>
+  <Step title="Validate the core manifest">
+    `/mnt/data/GPT.SKILLS/SYSTEM_CORE/MANIFEST.json` is read and validated. Required fields, types, `system_name`, `version`, path safety, and the `load_sequence` are all checked mechanically.
+  </Step>
+  <Step title="Mount the core load-sequence files">
+    Each file declared in `load_sequence` — `ENTRY.md`, `README.md`, `SEMANTICS.md`, and `OPERATIONAL_RULES.md` — is read and validated. Required files are confirmed as UTF-8 text. Optional files produce a degraded-load warning if missing or unreadable, but do not block activation.
+  </Step>
+  <Step title="Activate the core">
+    The core becomes semantically active for the current session. Lifecycle commands are now recognized and validated according to the rules in `OPERATIONAL_RULES.md`.
+  </Step>
+</Steps>
+
+## The core runtime files
+
+The four files mounted during core boot form the active semantic perimeter of the system. Each has a distinct role.
+
+<CardGroup cols={2}>
+  <Card title="ENTRY.md" icon="door-open" href="#the-core-runtime-files">
+    The bootstrap and activation entry point. Defines what activation means, what the session boundary is, and where command authority lives. It is the `primary_file` in the core manifest.
+  </Card>
+  <Card title="README.md" icon="book-open" href="#the-core-runtime-files">
+    The system overview. Describes what the skill system is for, what it does, and what it does not do. Contains no operational rules or lifecycle commands.
+  </Card>
+  <Card title="SEMANTICS.md" icon="brain" href="#the-core-runtime-files">
+    The mental model. Defines session-first thinking, what "active" means, the cooperative composition principle, and the boundary of change. Does not define command lifecycle or manifest validation.
+  </Card>
+  <Card title="OPERATIONAL_RULES.md" icon="list-check" href="#the-core-runtime-files">
+    The command lifecycle and validation rulebook. Defines `SKILL CORE UNPACK`, `SKILL <name> UNPACK`, and `SKILL <name> LOAD` behavior in full, including hard-fail conditions, manifest validation rules, path policy, and runtime limits.
+  </Card>
+</CardGroup>
+
+## Rerunning core unpack
+
+You can issue `SKILL CORE UNPACK` again at any point during an active chat.
+
+<Warning>
+  Rerunning `SKILL CORE UNPACK` in the same chat resets the active semantic state. All skills that were loaded earlier in the conversation are no longer considered active after the command completes. If you need those skills again, you must run `SKILL <name> LOAD` for each one after the new core boot finishes.
+</Warning>
+
+This behavior is intentional. Core unpack is a clean-slate operation by design. It removes the old `/mnt/data/GPT.SKILLS/` tree entirely before extracting a fresh copy.
+
+## Starting a fresh session
+
+When your work focus changes materially — you finish one task and move on to a different domain — the right move is to open a **new Project chat** and run a fresh targeted boot-and-load cycle rather than accumulating more skills in the same conversation.
+
+The reason is explained directly by the `SEMANTICS.md` file mounted during core boot:
+
+> The system should avoid loading skills "just in case" because excess active context degrades focus.
+
+A session built around a small, coherent set of skills produces sharper, more reliable results. Keeping old skills active from a previous task introduces semantic noise. A new chat gives you a clean context, a fresh core boot via `CUSTOM_INSTRUCTIONS.txt`, and the opportunity to load only what the current task actually requires.
+
+## Session boundary diagram
+
+The full lifecycle of a skill-enabled session looks like this:
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│  New Project chat                                           │
+│                                                             │
+│  CUSTOM_INSTRUCTIONS.txt triggers:                          │
+│  ┌─────────────────────┐                                    │
+│  │  SKILL CORE UNPACK  │  ← removes old /mnt/data/GPT.SKILLS│
+│  │                     │    extracts GPT.SKILLS.zip          │
+│  │                     │    validates + mounts core files    │
+│  └─────────────────────┘                                    │
+│              │                                              │
+│              ▼                                              │
+│  ┌─────────────────────────┐                               │
+│  │  SKILL <name> UNPACK    │  ← extracts <name>.zip into   │
+│  │                         │    /mnt/data/GPT.SKILLS/       │
+│  │                         │    SKILLS/<name>/              │
+│  │                         │    (installed, not yet active) │
+│  └─────────────────────────┘                               │
+│              │                                              │
+│              ▼                                              │
+│  ┌─────────────────────────┐                               │
+│  │  SKILL <name> LOAD      │  ← reads manifest + files     │
+│  │                         │    makes skill semantically    │
+│  │                         │    active for this session     │
+│  └─────────────────────────┘                               │
+│              │                                              │
+│              ▼                                              │
+│  ╔═════════════════════════╗                               │
+│  ║  Active session         ║  ← use your skills here       │
+│  ║  (skill set is live)    ║                               │
+│  ╚═════════════════════════╝                               │
+│              │                                              │
+│              ▼                                              │
+│  Close chat / open new chat                                 │
+│              │                                              │
+│              ▼                                              │
+│  Skills gone — no persistent state                          │
+└─────────────────────────────────────────────────────────────┘
+```

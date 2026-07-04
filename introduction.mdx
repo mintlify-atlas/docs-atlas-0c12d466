@@ -1,0 +1,80 @@
+---
+title: "GPT Project Skill System: session-scoped skills for ChatGPT"
+sidebarTitle: "Introduction"
+description: "Learn what the GPT Project Skill System is, why it exists, and how the session-first model differs from permanent skill installations."
+---
+
+ChatGPT Projects can host uploaded files as working context, but they provide no native skill-package workflow — no way to bundle reusable instructions, scripts, and assets into a distributable unit and load exactly what you need for a given session. The GPT Project Skill System fills that gap. It gives you a structured, explicit workflow for packaging skills as ZIP archives, uploading them to a Project, unpacking them into the runtime environment at `/mnt/data/GPT.SKILLS/`, and loading their declared instructions into the current session only when you choose to use them.
+
+## Three core ideas
+
+The entire system is built around three operations performed in sequence:
+
+1. **Package** — Author a skill as a directory of files, declare its load sequence in a `MANIFEST.json`, and build it into a ZIP archive.
+2. **Unpack** — Extract the ZIP into the Project runtime so its files are physically present under `/mnt/data/GPT.SKILLS/SKILLS/<name>/`.
+3. **Load** — Explicitly mount the skill's declared `load_sequence` files into the current session context.
+
+A skill is not active simply because its ZIP exists in the Project. Only an explicit `SKILL <name> LOAD` command makes a skill active — and only for the current chat session.
+
+## What a skill package can carry
+
+A skill ZIP is a flat archive with a `MANIFEST.json` at its root. Beyond the manifest, a skill package can include any combination of the following file types:
+
+| Field in manifest | Purpose |
+|---|---|
+| `load_sequence` | Instruction files mounted as active session context |
+| `support_files` | Reference or documentation files available after unpack |
+| `tool_files` | Python-compatible scripts usable from `/mnt` |
+| `asset_files` | Templates, data files, examples, or other assets |
+
+Only files listed in `load_sequence` are semantically active. Everything else is physically available after unpack but is never auto-mounted.
+
+## Where to go next
+
+<CardGroup cols={2}>
+  <Card title="Quickstart" icon="bolt" href="/quickstart">
+    Boot the core and load your first skill in five steps.
+  </Card>
+  <Card title="Core Concepts" icon="book-open" href="/concepts">
+    Understand sessions, packages, and how loading works.
+  </Card>
+  <Card title="Skill Package Format" icon="box-archive" href="/building-skills/skill-package-format">
+    Learn the exact ZIP shape, manifest schema, and path rules.
+  </Card>
+  <Card title="Command Reference" icon="terminal" href="/reference/commands">
+    See every lifecycle command and its exact behavior.
+  </Card>
+</CardGroup>
+
+## What this system does not do
+
+The GPT Project Skill System is deliberately narrow. It does not provide any of the following:
+
+<Warning>
+  **Explicit exclusions — the system provides none of these:**
+
+  - **No permanent install** — skills are never installed into the model or persisted outside the current chat.
+  - **No auto-discovery** — the system never scans Project sources or infers which skills are available.
+  - **No auto-loading** — a skill ZIP being present in the Project does not activate the skill.
+  - **No automatic routing** — active skills do not intercept requests or redirect input automatically.
+  - **No hooks** — there are no lifecycle hooks, event callbacks, or pre/post execution triggers.
+  - **No watchers** — no filesystem watchers, polling, or reactive file-change handling.
+  - **No daemons** — nothing runs in the background between turns.
+  - **No `pip install`** — tool scripts must rely only on the packages already present in the GPT Python environment.
+  - **No marketplace** — there is no registry, discovery feed, or hosted skill store.
+  - **No persistent runtime state** — the active skill set is destroyed at the end of the chat session.
+</Warning>
+
+These exclusions are intentional. The system is a focused loading primitive, not a framework.
+
+## Compatible with the agent skills ecosystem
+
+The GPT Project Skill System follows a bring-your-own-skills philosophy. The core provides the loading infrastructure — manifest validation, unpack mechanics, session-scoped mounting, and lifecycle commands. What goes into a skill package is entirely up to you.
+
+You can write skills for your own workflows, adapt existing instruction sets into the package format, or share skills with teammates as plain ZIP files. The system imposes no opinion on what a skill's instructions should contain, how they should be structured internally, or what domain they should serve. The only constraint is the package format itself: a flat ZIP, a valid `MANIFEST.json`, and safe relative paths throughout.
+
+---
+
+<Note>
+  This project is licensed under [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) — Creative Commons Attribution-ShareAlike 4.0 International.
+</Note>

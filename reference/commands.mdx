@@ -1,0 +1,194 @@
+---
+title: "GPT Project Skill System command reference"
+sidebarTitle: "Commands"
+description: "Full reference for all three GPT Project Skill System lifecycle commands: SKILL CORE UNPACK, SKILL UNPACK, and SKILL LOAD."
+---
+
+The GPT Project Skill System exposes three lifecycle commands that you type directly in a ChatGPT Project chat. Each command has a single declared target, performs strict validation before acting, and hard-fails on any error — it never silently continues past an invalid state. Understanding each command's scope and boundaries is essential before adding skills to a Project.
+
+## SKILL CORE UNPACK
+
+Boots the session core from `GPT.SKILLS.zip`.
+
+**Syntax**
+
+```text
+SKILL CORE UNPACK
+```
+
+**Target:** `GPT.SKILLS.zip` only.
+
+<Steps>
+  <Step title="Clean previous state">
+    Removes `/mnt/data/GPT.SKILLS/` before extraction. Also removes any legacy `/mnt/data/sistema_madre/` directory if present.
+  </Step>
+  <Step title="Extract the core archive">
+    Extracts `GPT.SKILLS.zip` into `/mnt/data/GPT.SKILLS/`. The extracted root must be exactly `/mnt/data/GPT.SKILLS/` — no other root is accepted.
+  </Step>
+  <Step title="Validate the core manifest">
+    Reads and validates `SYSTEM_CORE/MANIFEST.json`. Required fields: `system_name`, `version`, `primary_file`, `load_sequence`, `optional_load_sequence`. For core version `0.6`, `system_name` must be exactly `gpt_project_skill_system` and `version` must be exactly `"0.6"`.
+  </Step>
+  <Step title="Validate and mount load_sequence files">
+    Validates every file declared in `load_sequence`. Each must exist in the extracted tree, must be a file target (not a directory), and must be readable as UTF-8. Files in `optional_load_sequence` are probed and mounted if present and valid; missing or non-UTF-8 optional files produce a degraded-load warning and are skipped.
+  </Step>
+  <Step title="Activate the core">
+    Marks the core as semantically active for the current session.
+  </Step>
+</Steps>
+
+**Hard fail conditions**
+
+- The extracted root is anything other than `/mnt/data/GPT.SKILLS/`
+- `SYSTEM_CORE/MANIFEST.json` is missing, not valid JSON, or fails field validation
+- Any file in `load_sequence` is missing, is a directory target, or is not UTF-8
+- Any ZIP entry uses `\` as a path separator
+
+<Note>
+  Rerunning `SKILL CORE UNPACK` in the same chat **resets the active semantic state** and clears all previously loaded skills. Previously loaded skills are no longer considered active after core unpack completes.
+</Note>
+
+<Warning>
+  **Target boundary:** `SKILL CORE UNPACK` must not inspect, unpack, validate, load, compile, or activate any skill package. Skill ZIP files present in Project sources are inert until an explicit `SKILL <name> UNPACK` is issued. Presence in Project sources does not imply pre-scan, validation, or tool availability.
+</Warning>
+
+---
+
+## SKILL \<name\> UNPACK
+
+Installs a skill package physically into the skill directory.
+
+**Syntax**
+
+```text
+SKILL <name> UNPACK
+```
+
+**Example**
+
+```text
+SKILL skill-adapter UNPACK
+```
+
+**Target:** `<name>.zip` only.
+
+<Steps>
+  <Step title="Validate the slug">
+    Validates `<name>` against the slug rule: only `[a-z0-9_-]` characters, not empty, no spaces, no `.`, no `/`, no `\`, no `..`.
+  </Step>
+  <Step title="Verify the ZIP filename">
+    Confirms the ZIP filename is exactly `<name>.zip`. A filename mismatch is an immediate hard fail.
+  </Step>
+  <Step title="Verify the package structure">
+    Confirms `MANIFEST.json` is present at ZIP root and that no single wrapper directory surrounds the package contents.
+  </Step>
+  <Step title="Verify skill_name">
+    Reads `skill_name` from the skill manifest and confirms it equals `<name>`. The ZIP filename, command slug, installed folder name, and `skill_name` in the manifest must all match.
+  </Step>
+  <Step title="Extract into the skill directory">
+    Extracts the skill ZIP into `/mnt/data/GPT.SKILLS/SKILLS/<name>/`. If a previous extracted copy exists for the same skill, it is overwritten.
+  </Step>
+  <Step title="Validate for later load">
+    Validates the skill package enough to support a subsequent `SKILL <name> LOAD` — checks declared file presence and path safety.
+  </Step>
+</Steps>
+
+**Slug rule**
+
+```text
+^[a-z0-9_-]+$
+```
+
+No spaces, dots, slashes, backslashes, or `..` sequences are permitted.
+
+**Hard fail conditions**
+
+- `<name>` violates the slug rule
+- The ZIP filename is not `<name>.zip`
+- `skill_name` in the manifest does not equal `<name>`
+- The install path is not `/mnt/data/GPT.SKILLS/SKILLS/<name>/`
+- The ZIP contains a single wrapper directory at root instead of `MANIFEST.json`
+
+<Note>
+  `SKILL <name> UNPACK` installs the skill **physically** into `/mnt/data/GPT.SKILLS/SKILLS/<name>/`. It does **not** activate the skill semantically. A skill folder present under `SKILLS/` is installed, not active. Only `SKILL <name> LOAD` makes an installed skill active in the current session.
+</Note>
+
+---
+
+## SKILL \<name\> LOAD
+
+Mounts an installed skill and makes it semantically active in the current session.
+
+**Syntax**
+
+```text
+SKILL <name> LOAD
+```
+
+**Example**
+
+```text
+SKILL skill-adapter LOAD
+```
+
+**Target:** The installed skill at `/mnt/data/GPT.SKILLS/SKILLS/<name>/` only.
+
+<Steps>
+  <Step title="Confirm the skill is installed">
+    Fails immediately if the skill has not been unpacked into `/mnt/data/GPT.SKILLS/SKILLS/<name>/`. `SKILL <name> LOAD` does not auto-unpack.
+  </Step>
+  <Step title="Read the skill manifest">
+    Reads `MANIFEST.json` from the installed skill directory. If `primary_file` and `load_sequence` are omitted, the loader applies fallback mode: `primary_file = "SKILL.md"`, `load_sequence = ["SKILL.md"]`.
+  </Step>
+  <Step title="Read load_sequence files">
+    Reads every file declared in `load_sequence` (or the fallback sequence). Each file must exist, be a file target, and be readable as UTF-8.
+  </Step>
+  <Step title="Activate the skill">
+    Makes the skill semantically active in the current session. From this point the model has read the mounted skill files and can apply them when relevant to the current task.
+  </Step>
+</Steps>
+
+<Note>
+  Reloading the same skill with `SKILL <name> LOAD` performs a **full semantic reload** — the skill context is re-read from the installed files.
+</Note>
+
+---
+
+## Command target boundaries
+
+Each command may operate only on its declared target. The table below summarises the strict scope of each command.
+
+| Command | Declared target | May it touch skill ZIPs? |
+|---|---|---|
+| `SKILL CORE UNPACK` | `GPT.SKILLS.zip` | No — hard boundary |
+| `SKILL <name> UNPACK` | `<name>.zip` | Its own ZIP only |
+| `SKILL <name> LOAD` | Installed skill at `SKILLS/<name>/` | No ZIP access |
+
+The runtime must not pre-scan, pre-validate, compile, inspect, or infer capability from skill packages that were not named by an explicit lifecycle command. Presence of a skill ZIP in Project sources is inert until `SKILL <name> UNPACK` is explicitly issued.
+
+---
+
+## Natural language aliases
+
+You can also trigger the unpack and load commands using natural language. The following phrases are accepted as equivalents to the formal command syntax:
+
+```text
+Unpack the skill-adapter skill.
+Load the skill-adapter skill.
+```
+
+These are recognized as natural language equivalents to `SKILL skill-adapter UNPACK` and `SKILL skill-adapter LOAD` respectively.
+
+<CardGroup cols={2}>
+  <Card title="Path Rules" icon="shield-halved" href="/reference/path-rules">
+    ZIP entry separator and safe relative path requirements.
+  </Card>
+  <Card title="Runtime Limits" icon="gauge" href="/reference/runtime-limits">
+    What the system explicitly does not provide.
+  </Card>
+  <Card title="Manifest Reference" icon="file-lines" href="/building-skills/manifest-reference">
+    Every manifest field for core and skill packages.
+  </Card>
+  <Card title="Session Lifecycle" icon="arrows-rotate" href="/using-skills/session-lifecycle">
+    How to open, boot, load, and close a skill session.
+  </Card>
+</CardGroup>

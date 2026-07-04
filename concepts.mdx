@@ -1,0 +1,102 @@
+---
+title: "Core concepts: sessions, packages, and skill loading"
+sidebarTitle: "Concepts"
+description: "Understand the GPT Project Skill System's session-first model, the difference between installed and active skills, and how mounting works."
+---
+
+To use the GPT Project Skill System effectively, it helps to hold a clear mental model of what the system actually is — and what it deliberately is not. The system is a focused loading primitive. It constructs a targeted chat session with a small, coherent set of semantically active skills. It is not a background service, not a permanent capability library, and not a framework that manages state between conversations. Every concept below flows from that core design decision.
+
+## Session-first model
+
+The session is the operating unit of the GPT Project Skill System.
+
+When you boot the core and load a skill, you are building a session — a single chat with a specific set of active instructions tailored to the work in front of you. The system is not a permanent skill registry. There is no always-on capability library accumulating state in the background. There is only the current chat and what you have explicitly loaded into it.
+
+`GPT.SKILLS/` is the physical root of the system after core unpack. Inside it, `SYSTEM_CORE/` holds the mounted core files and `SKILLS/` holds the physically installed skill folders. Neither directory is a semantic registry on its own. Their contents become meaningful only when a lifecycle command reads and mounts them.
+
+When the work focus changes materially — when you shift from one task to an entirely different one — the right move is to open a new chat and repeat a targeted boot and load cycle. This keeps the active context small, coherent, and relevant.
+
+## The core and skill split
+
+The system separates two distinct layers of responsibility:
+
+**The core** defines the infrastructure of the session:
+- bootstrap meaning and activation contract
+- global lifecycle boundaries
+- command semantics (via `OPERATIONAL_RULES.md`)
+- manifest validation rules
+- the limits and non-features of the system
+
+**A skill** defines local, domain-specific capability:
+- what capability it adds to the session
+- when that capability is useful
+- what input and output it handles
+- any optional local hints or supporting AI-only files
+
+A skill must not redefine global core behavior. The core owns the rules; a skill owns its own scope. This boundary keeps skills composable and prevents one skill from accidentally overriding another or the core itself.
+
+## Installed vs. active
+
+A skill exists in two distinct states, and confusing them is the most common source of misunderstanding:
+
+| State | What it means | How you get there |
+|---|---|---|
+| **Installed** | The skill folder is present under `SKILLS/` on disk | `SKILL <name> UNPACK` |
+| **Active** | The skill's `load_sequence` files are mounted in this session | `SKILL <name> LOAD` |
+
+A skill folder present under `/mnt/data/GPT.SKILLS/SKILLS/` means the skill is **installed physically**. Its files are accessible on disk. It does not mean the skill is doing anything. The model has not read it. It has no effect on the session.
+
+Only `SKILL <name> LOAD` makes an installed skill **active**. Active means the model has read the mounted skill files and applies their guidance when relevant to the current task.
+
+```text
+ZIP present in Project sources
+        │
+        ▼  SKILL <name> UNPACK
+Files on disk under SKILLS/<name>/     ← installed, not active
+        │
+        ▼  SKILL <name> LOAD
+load_sequence files read into session  ← active
+```
+
+## Mount meaning
+
+"Mounting" a skill is the specific action performed by `SKILL <name> LOAD`. Understanding what mount means — and what it does not mean — prevents a wide class of false expectations.
+
+**Mount means:**
+- The files declared in the skill's `load_sequence` are read
+- Those files pass validation (present, UTF-8 readable, file targets not directories)
+- Their contents are semantically inserted into the current session context
+- The model treats them as active guidance for the rest of the chat
+
+**Mount does not mean:**
+
+<Info>
+  These behaviors are explicitly outside the scope of mounting and are never provided by this system.
+</Info>
+
+- **Installation into the model** — no weights are changed; nothing is stored permanently
+- **Runtime binding** — no function is registered or called automatically
+- **Persistent enforcement** — the skill does not outlive the current chat session
+- **Automatic routing** — the skill does not intercept or redirect incoming messages
+- **Watcher behavior** — nothing monitors file changes or reacts to filesystem events
+- **Serialized state** — no session state is written to disk between turns
+
+## Cooperative composition
+
+Multiple skills can be active in the same session when they support the same work focus. Their composition is **cooperative, not sequential**. The model weighs the full pool of active skills against the current task and applies whichever guidance is most relevant.
+
+There is no priority queue, no skill-router, and no conflict-resolution protocol. Skills that are well-scoped and focused complement each other naturally. Skills that overlap or contradict each other produce noise.
+
+This has a practical implication: **avoid loading skills "just in case."** Loading a skill you might not need dilutes the active context. Excess active context degrades focus and makes the session less precise. A session with two tightly relevant skills almost always outperforms a session with six loosely related ones.
+
+## Boundary of change
+
+The session-first model has a natural consequence for workflow: when your work focus changes materially, the active session should end.
+
+Open a new chat in the same Project, boot the core, and load only the skills relevant to the new task. This resets the active semantic set to exactly what the new work requires, prevents drift from accumulated context, and keeps each session purposeful.
+
+Rerunning `SKILL CORE UNPACK` in the same chat also resets the active semantic state — previously loaded skills are no longer considered active after core unpack. Use this if you need to restart the session without opening a new chat.
+
+<Tip>
+  Keep the active skill set small and focused. One or two well-scoped skills loaded for a specific task will consistently outperform a broad collection of loosely related skills all loaded at once. When the task changes, start a new chat and reload with intention.
+</Tip>

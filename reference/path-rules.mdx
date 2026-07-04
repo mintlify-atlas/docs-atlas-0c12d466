@@ -1,0 +1,191 @@
+---
+title: "Path safety rules for skill packages and ZIP entries"
+sidebarTitle: "Path Rules"
+description: "Reference for GPT Project Skill System path safety requirements governing ZIP entries, manifest paths, and skill package directory structures."
+---
+
+The system enforces strict path safety rules on all ZIP entries and manifest-declared paths. These rules apply at build time via `build_packages.py` and again at runtime during unpack and load. Any unsafe path causes an immediate hard fail — there is no silent normalization, no automatic correction, and no fallback to a guessed safe form.
+
+## Safe relative path rules
+
+A path is considered a **safe relative path** when it satisfies all of the following conditions:
+
+- **Not absolute** — does not start with `/`
+- **No `..` traversal** — no `..` segment anywhere in the path
+- **No backslash separators** — uses `/` only, never `\`
+- **No empty path segments** — no `//` or trailing `/`
+- **No drive letters** — no `C:`, `D:`, or similar Windows-style prefixes
+- **No wrapper-directory-as-root** — the ZIP must not have a single top-level directory surrounding all content
+
+**Valid examples**
+
+```text
+MANIFEST.json
+SKILL.md
+docs/reference.md
+tools/profile_csv.py
+templates/template.csv
+```
+
+**Invalid examples**
+
+```text
+/SKILL.md              ← absolute path
+../sibling/SKILL.md    ← path traversal with ..
+docs\reference.md      ← backslash separator
+C:docs/reference.md    ← drive letter prefix
+docs//reference.md     ← empty path segment
+```
+
+The `is_safe_relative_path` function in `build_packages.py` enforces this rule on every ZIP entry and every manifest-declared path. It checks: non-empty string, no `\` character, does not start with `/`, is not otherwise absolute, does not begin with a drive-letter pattern (`[A-Za-z]:`), no `..` in path parts, and no empty segments when split by `/`.
+
+<Warning>
+  The build script will **not** silently normalize invalid entries. If any ZIP entry or manifest path fails the safety check, the build hard-fails immediately with a descriptive error. Fix the source, then rebuild.
+</Warning>
+
+---
+
+## ZIP entry separator rule
+
+All ZIP entries in every package — core and skill — must use POSIX `/` path separators. The `\` character is never permitted as a path separator in a ZIP entry name.
+
+```text
+Valid:
+  SYSTEM_CORE/MANIFEST.json
+  SYSTEM_CORE/OPERATIONAL_RULES.md
+  SKILLS/README.md
+  docs/columns.md
+  tools/profile_csv.py
+
+Invalid:
+  SYSTEM_CORE\MANIFEST.json
+  SKILLS\README.md
+  docs\columns.md
+```
+
+The runtime hard-fails if a core or skill package contains ZIP entries with `\`. The build script writes all entries using `Path.as_posix()` and validates the written ZIP immediately after creation to confirm no backslash entries were introduced.
+
+---
+
+## Core path policy
+
+Core path policy is stricter than skill path policy. The following rules apply exclusively to paths declared inside `SYSTEM_CORE/MANIFEST.json`.
+
+- **Direct filenames only** — mounted paths must be bare filenames with no subdirectory component. `SEMANTICS.md` is valid; `subdir/SEMANTICS.md` is not.
+- **Allowed extensions** — only `.md` and `.json`.
+- **Must resolve under `SYSTEM_CORE/`** — every path in `load_sequence` and `optional_load_sequence` is resolved as `SYSTEM_CORE/<path>`. A path that references anything outside `SYSTEM_CORE/` is invalid.
+- **No absolute paths or `..`** — the same safe-relative rules apply.
+
+```json
+{
+  "load_sequence": [
+    "ENTRY.md",
+    "README.md",
+    "SEMANTICS.md",
+    "OPERATIONAL_RULES.md"
+  ],
+  "optional_load_sequence": []
+}
+```
+
+Each entry above resolves to `SYSTEM_CORE/ENTRY.md`, `SYSTEM_CORE/README.md`, and so on.
+
+<Info>
+  `SKILLS/README.md` is not mountable and must not appear in the core manifest. It is a physical placeholder for the skills directory and must not be used as a list of active skills.
+</Info>
+
+---
+
+## Skill path policy
+
+Skill packages have a more permissive path policy than the core, but all safe-relative rules still apply.
+
+- **Nested folders are allowed** — a skill ZIP may include internal folders (`docs/`, `tools/`, `templates/`, etc.) and those paths may appear in manifest fields.
+- **`load_sequence` entries may be nested** — for example `docs/reference.md` is a valid `load_sequence` entry as long as it is a safe relative path and the file is a UTF-8 textual file.
+- **All declared paths must be safe relative** — every entry in `load_sequence`, `support_files`, `tool_files`, and `asset_files` must pass the safe-relative-path check.
+- **`load_sequence` files must be AI-only textual** — no scripts, no binary assets, no unavailable external resources.
+
+```json
+{
+  "skill_name": "csv-profiler",
+  "version": "1.0",
+  "primary_file": "SKILL.md",
+  "load_sequence": ["SKILL.md"],
+  "support_files": ["docs/columns.md"],
+  "tool_files": ["tools/profile_csv.py"],
+  "asset_files": ["templates/template.csv"]
+}
+```
+
+All four path fields above are safe relative paths. `docs/columns.md` is a nested path valid for `support_files`. Scripts like `tools/profile_csv.py` are valid in `tool_files` — they are never mounted or run automatically.
+
+---
+
+## Wrapper directory rule
+
+The **single wrapper directory** error is the most common packaging mistake. A skill ZIP must not have a single top-level directory surrounding all of its contents. `MANIFEST.json` must appear at the ZIP root.
+
+**Valid — `MANIFEST.json` at ZIP root**
+
+```text
+csv-profiler.zip
+  MANIFEST.json          ← at root ✓
+  SKILL.md
+  docs/
+    columns.md
+  tools/
+    profile_csv.py
+  templates/
+    template.csv
+```
+
+**Invalid — single wrapper directory**
+
+```text
+csv-profiler.zip
+  csv-profiler/          ← wrapper directory ✗
+    MANIFEST.json
+    SKILL.md
+    docs/
+    tools/
+```
+
+In the invalid form, `MANIFEST.json` is one level deep inside `csv-profiler/` instead of at the ZIP root. The runtime detects this as a single wrapper directory and hard-fails.
+
+The build script checks this by examining the set of top-level entries. If there is exactly one top-level entry and it is not `MANIFEST.json`, the build fails with:
+
+```text
+ERROR: skill ZIP contains single wrapper directory: csv-profiler/
+```
+
+The same rule applies to the core ZIP: `SYSTEM_CORE/` and `SKILLS/` must be the two top-level entries.
+
+---
+
+## Build-time enforcement
+
+The `build_packages.py` script enforces all path rules before a ZIP is considered valid. The enforcement sequence is:
+
+1. **Write the ZIP** — all entries are written using `Path.as_posix()` to guarantee POSIX separators.
+2. **Re-read entry names** — the written ZIP is immediately re-opened and all entry names are validated.
+3. **Check for backslashes** — any `\` in any entry name causes an immediate hard fail.
+4. **Check safe-relative on every entry** — `is_safe_relative_path` is called for every entry name.
+5. **Check manifest-declared paths** — every path in `load_sequence`, `support_files`, `tool_files`, and `asset_files` is individually validated before the ZIP is written.
+6. **Check wrapper directory** — the set of top-level ZIP entries is inspected to detect a single wrapper directory.
+
+All checks are fail-fast: the script raises `SystemExit` at the first failure and prints a descriptive error message. No partially-built ZIP is left in place after a failure.
+
+<CardGroup cols={2}>
+  <Card title="Commands" icon="terminal" href="/reference/commands">
+    Full reference for SKILL CORE UNPACK, SKILL UNPACK, and SKILL LOAD.
+  </Card>
+  <Card title="Runtime Limits" icon="gauge" href="/reference/runtime-limits">
+    What the system explicitly does not provide.
+  </Card>
+  <Card title="Manifest Reference" icon="file-lines" href="/building-skills/manifest-reference">
+    Every manifest field for core and skill packages.
+  </Card>
+  <Card title="Mental Model" icon="brain" href="/concepts">
+    How the session-first model and skill activation work.
+  </Card>
+</CardGroup>

@@ -1,0 +1,70 @@
+{
+  "projectType": "general",
+  "projectName": "GPT Project Skill System",
+  "projectDescription": "A session-scoped skill loader for ChatGPT Projects that lets you package reusable skills as ZIP files, unpack them into the Project runtime, and explicitly mount them as active context for the current session.",
+  "theme": "luma",
+  "primaryColor": "#6366F1",
+  "lightColor": "#818CF8",
+  "darkColor": "#4338CA",
+  "navigation": {
+    "tabs": [
+      {
+        "tab": "Documentation",
+        "groups": [
+          {
+            "group": "Get Started",
+            "pages": [
+              "introduction",
+              "quickstart",
+              "concepts"
+            ]
+          },
+          {
+            "group": "Using Skills",
+            "pages": [
+              "using-skills/session-lifecycle",
+              "using-skills/loading-skills",
+              "using-skills/skill-adapter"
+            ]
+          },
+          {
+            "group": "Building Skills",
+            "pages": [
+              "building-skills/skill-package-format",
+              "building-skills/manifest-reference",
+              "building-skills/adapting-a-skill",
+              "building-skills/packaging"
+            ]
+          },
+          {
+            "group": "Reference",
+            "pages": [
+              "reference/commands",
+              "reference/path-rules",
+              "reference/runtime-limits"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "keyFeatures": [
+    "Session-scoped skill activation — skills are active only inside the current chat session",
+    "Explicit lifecycle commands (SKILL CORE UNPACK, SKILL <name> UNPACK, SKILL <name> LOAD)",
+    "ZIP-based skill packages with MANIFEST.json declaring load_sequence, support_files, tool_files, and asset_files",
+    "Fallback and explicit manifest modes for simple and complex skill packages",
+    "Build script (build_packages.py) with full package validation including path safety and ZIP entry checks",
+    "Included skill-adapter skill for inspecting and adapting external skill packages",
+    "No hooks, no persistent state, no automatic routing, no marketplace behavior",
+    "Cooperative skill composition — multiple skills can be active in the same session"
+  ],
+  "publicApiSurface": [
+    "SKILL CORE UNPACK — boot the core from GPT.SKILLS.zip",
+    "SKILL <name> UNPACK — install a skill ZIP into /mnt/data/GPT.SKILLS/SKILLS/<name>/",
+    "SKILL <name> LOAD — mount an installed skill as semantically active in the current session",
+    "MANIFEST.json (core) — fields: system_name, version, primary_file, load_sequence, optional_load_sequence",
+    "MANIFEST.json (skill) — fields: skill_name, version, primary_file, load_sequence, support_files, tool_files, asset_files, capabilities, runtime_hints",
+    "scripts/build_packages.py — build and validate GPT.SKILLS.zip and skill ZIPs",
+    "skill-adapter — inspect and adapt external skill packages; produces PASS/PASS_WITH_WARNINGS/BLOCKED compatibility report"
+  ]
+}

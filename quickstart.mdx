@@ -1,47 +1,95 @@
 ---
-title: "Quickstart"
-description: "Begin with a guide on the fastest path to a successful outcome"
+title: "Get started with the GPT Project Skill System"
+sidebarTitle: "Quickstart"
+description: "Boot the GPT Project Skill System core and load your first skill inside a ChatGPT Project in five steps."
 ---
 
-Describe how someone begins using your product. What is the first thing they need to do? Are there any prerequisites?
-
-A quickstart should take someone from zero to using your product. They'll get a quick win and a sense of what they can accomplish.
-
-## Prerequisites
-
-Before you begin, you must have:
-
-- Requirement one (for example, Node.js 18+, a free account, an API key)
-- Requirement two (for example, a compatible device, a compatible browser, a compatible operating system)
-
-## Get started
+This quickstart walks you through the full bootstrap sequence from a blank ChatGPT Project to an active, loaded skill. By the end you will have the system core unpacked, the `skill-adapter` skill physically installed, and that skill semantically active in your session — ready to inspect and adapt external skill packages.
 
 <Steps>
-  <Step title="Install">
-    Describe how to install your product or sign up.
+  <Step title="Add packages to your Project">
+    Upload two files to your ChatGPT Project's sources:
 
-    ```bash
-    npm install your-package
+    - `dist/GPT.SKILLS.zip` — the core runtime package
+    - `dist/skills/skill-adapter.zip` — the bundled adapter skill
+
+    Then open your Project settings and paste the full contents of `CUSTOM_INSTRUCTIONS.txt` into the **Project instructions** field. These instructions tell ChatGPT to unpack `GPT.SKILLS.zip` into `/mnt/data/GPT.SKILLS/` at startup and immediately read the core manifest at `/mnt/data/GPT.SKILLS/SYSTEM_CORE/MANIFEST.json`.
+
+    ```text
+    At the start, unpack `GPT.SKILLS.zip` into `/mnt/data/GPT.SKILLS/`.
+
+    Read `/mnt/data/GPT.SKILLS/SYSTEM_CORE/MANIFEST.json` and follow its `load_sequence`.
     ```
+
+    <Info>
+      Both ZIPs must be present as Project sources before you start a chat. Skill ZIPs added later require a new chat to be seen by the boot sequence.
+    </Info>
   </Step>
-  <Step title="Configure">
-    Describe any setup or configuration needed before first use.
 
-    ```bash
-    your-cli init
+  <Step title="Start a new chat">
+    Open a **new chat** inside the Project. The Project instructions fire automatically at the start of the conversation. The core auto-unpacks `GPT.SKILLS.zip` into `/mnt/data/GPT.SKILLS/`, validates `SYSTEM_CORE/MANIFEST.json`, and loads the core files declared in its `load_sequence`:
+
+    ```text
+    ENTRY.md → README.md → SEMANTICS.md → OPERATIONAL_RULES.md
     ```
+
+    When the boot succeeds, the model confirms the core is active for the current session.
   </Step>
-  <Step title="Run it">
-    Show the first thing a user does to see it working.
 
-    ```bash
-    your-cli start
+  <Step title="Boot the core explicitly (if needed)">
+    If the auto-unpack did not fire — for example, because the Project instructions were not saved before the chat started — trigger core boot manually by typing:
+
+    ```text
+    SKILL CORE UNPACK
     ```
+
+    This command removes any previous `/mnt/data/GPT.SKILLS/` tree, extracts `GPT.SKILLS.zip` fresh, validates the manifest, and activates the core. Running it again in the same session resets the active semantic state and clears any previously loaded skills.
+  </Step>
+
+  <Step title="Unpack the skill">
+    Install `skill-adapter` physically into the skill directory by typing:
+
+    ```text
+    SKILL skill-adapter UNPACK
+    ```
+
+    The system verifies that `skill-adapter.zip` has a flat root, a valid `MANIFEST.json` whose `skill_name` equals `skill-adapter`, and safe internal paths. It then extracts the archive into:
+
+    ```text
+    /mnt/data/GPT.SKILLS/SKILLS/skill-adapter/
+    ```
+
+    The skill is now installed on disk. It is **not yet active** — unpack is a physical operation only.
+  </Step>
+
+  <Step title="Load the skill">
+    Make `skill-adapter` semantically active for this session by typing:
+
+    ```text
+    SKILL skill-adapter LOAD
+    ```
+
+    The loader reads the skill's manifest, walks its `load_sequence`, and mounts each declared instruction file into the current session context. Once this command succeeds, the skill is active and the model applies its guidance to relevant tasks in this chat.
   </Step>
 </Steps>
 
-<Tip>
-  Give people a way to get help. This could be a link to a support page, a chat with a customer support agent, or a forum for your product.
+<Note>
+  **Session boundary** — The active skill set exists only inside the current chat. When you open a new chat (even in the same Project), the session resets. Repeat the boot and load steps to rebuild your active skill set in the new chat. This is by design: each session starts with a clean, targeted context.
+</Note>
 
-  Example: Need help? Reach out to us at [support@yourcompany.com](mailto:support@yourcompany.com).
-</Tip>
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Core Concepts" icon="book-open" href="/concepts">
+    Understand the session-first model and what loading really means.
+  </Card>
+  <Card title="Session Lifecycle" icon="arrow-rotate-right" href="/using-skills/session-lifecycle">
+    Learn how sessions start, reset, and end.
+  </Card>
+  <Card title="Loading Skills" icon="play" href="/using-skills/loading-skills">
+    Explore load sequences, fallback mode, and reload behavior.
+  </Card>
+  <Card title="Skill Package Format" icon="box-archive" href="/building-skills/skill-package-format">
+    Build your own skill package from scratch.
+  </Card>
+</CardGroup>

@@ -1,0 +1,170 @@
+---
+title: "skill-adapter: inspect and adapt external skill packages"
+sidebarTitle: "Skill Adapter"
+description: "The skill-adapter skill reviews external skill ZIPs for compatibility with the GPT Project Skill System and produces a structured adaptation report."
+---
+
+`skill-adapter` is a built-in skill that helps you inspect an external skill ZIP before adapting it to the GPT Project Skill System package format. Rather than silently converting or guessing at compatibility, it produces a structured candidate package plan and a compatibility report with a clear rating — **PASS**, **PASS\_WITH\_WARNINGS**, or **BLOCKED** — so you know exactly what needs operator attention before you build a new package. It ships as `dist/skills/skill-adapter.zip` and is ready to add to any Project alongside `dist/GPT.SKILLS.zip`.
+
+## Loading skill-adapter
+
+Add `dist/skills/skill-adapter.zip` to your ChatGPT Project sources, then run the two standard lifecycle commands at the start of your session:
+
+<Steps>
+  <Step title="Unpack skill-adapter">
+    Installs the skill files into the runtime environment.
+
+    ```text
+    SKILL skill-adapter UNPACK
+    ```
+  </Step>
+  <Step title="Load skill-adapter">
+    Mounts the skill and makes it semantically active for the current session.
+
+    ```text
+    SKILL skill-adapter LOAD
+    ```
+  </Step>
+</Steps>
+
+Once loaded, you can give `skill-adapter` a path to an external skill ZIP (or an extracted folder) and ask it to inspect the package.
+
+## What skill-adapter checks
+
+During a mechanical inspection, `skill-adapter` examines the following aspects of a candidate skill package:
+
+<CardGroup cols={2}>
+  <Card title="Path safety" icon="shield-check" href="#what-skill-adapter-checks">
+    Flags absolute paths, `..` traversal, backslashes, drive letters, empty segments, and single wrapper directories at the ZIP root.
+  </Card>
+  <Card title="ZIP entries" icon="file-zipper" href="#what-skill-adapter-checks">
+    Verifies that all ZIP entries use POSIX `/` separators. Backslash entries are a hard fail.
+  </Card>
+  <Card title="File inventory" icon="list" href="#what-skill-adapter-checks">
+    Walks the full extracted file tree and categorises every file as a likely support, tool, or asset file.
+  </Card>
+  <Card title="Candidate manifests" icon="file-code" href="#what-skill-adapter-checks">
+    Reads an existing `MANIFEST.json` if present and validates it against the system rules. Reports whether it can be reused, needs correction, or must be replaced.
+  </Card>
+  <Card title="Likely primary file" icon="star" href="#what-skill-adapter-checks">
+    Searches for `SKILL.md`, `skill.md`, `README.md`, or the first Markdown file to propose a `primary_file` candidate.
+  </Card>
+  <Card title="Scripts" icon="terminal" href="#what-skill-adapter-checks">
+    Identifies script files (`.py`, `.sh`, `.js`, etc.) and — for Python — parses imports to flag non-standard-library dependencies.
+  </Card>
+  <Card title="Binary files" icon="database" href="#what-skill-adapter-checks">
+    Detects non-textual assets and notes any that are referenced in `load_sequence`, which is a hard blocker.
+  </Card>
+  <Card title="External mechanism indicators" icon="triangle-exclamation" href="#what-skill-adapter-checks">
+    Scans text files for markers such as `pip install`, `npm install`, `daemon`, `watcher`, `webhook`, and source-runtime wording (e.g. `claude`) that indicate incompatible runtime assumptions.
+  </Card>
+</CardGroup>
+
+## Compatibility ratings
+
+Every report produced by `skill-adapter` ends with one of three ratings:
+
+<CardGroup cols={3}>
+  <Card title="PASS" icon="circle-check" href="#compatibility-ratings">
+    No hard blockers found. The package can be built under the current rules. Any remaining assumptions are stated explicitly in the report.
+  </Card>
+  <Card title="PASS_WITH_WARNINGS" icon="circle-exclamation" href="#compatibility-ratings">
+    The package can be built, but some files or behaviors require operator review or task-time caution before the skill is used in production.
+  </Card>
+  <Card title="BLOCKED" icon="ban" href="#compatibility-ratings">
+    A hard blocker prevents a valid package candidate. The report lists every blocker and, where possible, describes the fix required.
+  </Card>
+</CardGroup>
+
+## Hard blockers
+
+The following conditions always produce a **BLOCKED** rating. None of them can be overridden by operator decision alone — the underlying issue must be fixed in the source package first.
+
+- **Unsafe paths** — absolute paths, `..` traversal, backslashes, drive letters, or empty path segments anywhere in the package.
+- **ZIP entries with backslashes** — POSIX `/` is required for all ZIP entry names.
+- **Missing declared files** — a file referenced in `load_sequence`, `support_files`, `tool_files`, or `asset_files` does not exist after extraction.
+- **Invalid manifest identity** — `skill_name` does not match the expected slug, or required manifest fields are missing or the wrong type.
+- **Mounted file not readable as UTF-8** — any file in `load_sequence` that cannot be decoded as UTF-8 text.
+- **Script or binary file in `load_sequence`** — only AI-only UTF-8 textual files may be semantically mounted.
+- **Required `pip install` or network install** — tool files that depend on packages unavailable in the GPT Python environment.
+- **Required hook, daemon, watcher, external CLI, or persistent service** — the skill depends on runtime mechanisms the system does not provide.
+
+## Report output shape
+
+Every adaptation report follows this structure:
+
+```text
+Compatibility: PASS | PASS_WITH_WARNINGS | BLOCKED
+
+Source:
+- path:
+- shape:
+
+Loader mode:
+- fallback | explicit
+
+Manifest draft:
+  {
+    "skill_name": "...",
+    "version": "...",
+    "primary_file": "...",
+    "load_sequence": ["..."],
+    "support_files": ["..."],
+    "tool_files": ["..."],
+    "asset_files": []
+  }
+
+Mounted files:
+- <relative path to each file in load_sequence>
+
+Physical files:
+- support_files: <list>
+- tool_files:    <list>
+- asset_files:   <list>
+
+Findings:
+- severity: BLOCKER | WARNING
+  file: <path>
+  issue: <description>
+  fix: <recommended action>
+
+Operator decisions:
+- <items that require a human call before the package can be finalised>
+
+Claim:
+- candidate inspected for GPT Project Skill System adaptation;
+  operator review still required
+```
+
+`Loader mode` is either `fallback` (root `SKILL.md` with minimal manifest) or `explicit` (declared `primary_file` and `load_sequence`). The `Manifest draft` section is omitted when blockers prevent a valid draft from being produced.
+
+## skill-adapter manifest
+
+The full `MANIFEST.json` shipped with the `skill-adapter` package:
+
+```json
+{
+  "skill_name": "skill-adapter",
+  "version": "0.1.0",
+  "primary_file": "SKILL.md",
+  "load_sequence": ["SKILL.md"],
+  "support_files": ["references/adaptation_report_schema.md"],
+  "tool_files": ["scripts/inspect_skill_candidate.py"],
+  "asset_files": [],
+  "capabilities": ["skill-adaptation", "compatibility-review", "manifest-drafting"],
+  "runtime_hints": {
+    "uses_python": true,
+    "output": "candidate package plan plus compatibility report"
+  }
+}
+```
+
+`SKILL.md` is the only semantically mounted file. `references/adaptation_report_schema.md` is a support reference consulted when drafting reports. `scripts/inspect_skill_candidate.py` is a tool file — physically available after unpack, but never run automatically.
+
+<Tip>
+  When Code Interpreter file access is available in your session, you can ask `skill-adapter` to run `scripts/inspect_skill_candidate.py` directly against a candidate ZIP or extracted folder. The script produces a full JSON inspection report covering path safety, wrapper detection, manifest validation, Python import analysis, and runtime-marker scanning — giving you a precise, machine-checked baseline before any manual adaptation work begins.
+</Tip>
+
+<Note>
+  `skill-adapter` operates entirely within the bounds of the current session. It does not modify the system core, does not make any inspected or adapted package active, does not execute tool files automatically, and does not install any dependencies. A compatibility report is evidence for operator review — it is not a guarantee of general compatibility or a substitute for testing the adapted package yourself.
+</Note>
